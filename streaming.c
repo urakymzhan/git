@@ -224,24 +224,25 @@ static int open_istream_loose(struct git_istream *st, struct repository *r,
 			      enum object_type *type)
 {
 	struct object_info oi = OBJECT_INFO_INIT;
+	enum unpack_loose_header_result hdr_ret;
 	oi.sizep = &st->size;
 	oi.typep = type;
 
 	st->u.loose.mapped = map_loose_object(r, oid, &st->u.loose.mapsize);
 	if (!st->u.loose.mapped)
 		return -1;
-	if ((unpack_loose_header(&st->z,
-				 st->u.loose.mapped,
-				 st->u.loose.mapsize,
-				 st->u.loose.hdr,
-				 sizeof(st->u.loose.hdr),
-				 NULL) < 0) ||
-	    (parse_loose_header(st->u.loose.hdr, &oi) < 0) ||
-	    *type < 0) {
-		git_inflate_end(&st->z);
-		munmap(st->u.loose.mapped, st->u.loose.mapsize);
-		return -1;
+	hdr_ret = unpack_loose_header(&st->z, st->u.loose.mapped,
+				      st->u.loose.mapsize, st->u.loose.hdr,
+				      sizeof(st->u.loose.hdr), NULL);
+	switch (hdr_ret) {
+	case UNPACK_LOOSE_HEADER_RESULT_OK:
+		break;
+	case UNPACK_LOOSE_HEADER_RESULT_BAD:
+	case UNPACK_LOOSE_HEADER_RESULT_BAD_TOO_LONG:
+		goto error;
 	}
+	if (parse_loose_header(st->u.loose.hdr, &oi) < 0 || *type < 0)
+		goto error;
 
 	st->u.loose.hdr_used = strlen(st->u.loose.hdr) + 1;
 	st->u.loose.hdr_avail = st->z.total_out;
@@ -250,6 +251,10 @@ static int open_istream_loose(struct git_istream *st, struct repository *r,
 	st->read = read_istream_loose;
 
 	return 0;
+error:
+	git_inflate_end(&st->z);
+	munmap(st->u.loose.mapped, st->u.loose.mapsize);
+	return -1;
 }
 
 

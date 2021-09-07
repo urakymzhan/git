@@ -477,23 +477,36 @@ int for_each_object_in_pack(struct packed_git *p,
 int for_each_packed_object(each_packed_object_fn, void *,
 			   enum for_each_object_flags flags);
 
+enum unpack_loose_header_result {
+	UNPACK_LOOSE_HEADER_RESULT_BAD_TOO_LONG = -2,
+	UNPACK_LOOSE_HEADER_RESULT_BAD = -1,
+	UNPACK_LOOSE_HEADER_RESULT_OK,
+
+};
+
 /**
  * unpack_loose_header() initializes the data stream needed to unpack
  * a loose object header.
  *
- * Returns 0 on success. Returns negative values on error. If the
- * header exceeds MAX_HEADER_LEN -2 will be returned.
+ * Returns UNPACK_LOOSE_HEADER_RESULT_OK on success. Returns
+ * UNPACK_LOOSE_HEADER_RESULT_BAD values on error, or if the header
+ * exceeds MAX_HEADER_LEN UNPACK_LOOSE_HEADER_RESULT_BAD_TOO_LONG will
+ * be returned.
  *
  * It will only parse up to MAX_HEADER_LEN bytes unless an optional
  * "hdrbuf" argument is non-NULL. This is intended for use with
  * OBJECT_INFO_ALLOW_UNKNOWN_TYPE to extract the bad type for (error)
  * reporting. The full header will be extracted to "hdrbuf" for use
- * with parse_loose_header(), -2 will still be returned from this
- * function to indicate that the header was too long.
+ * with parse_loose_header(), UNPACK_LOOSE_HEADER_RESULT_BAD_TOO_LONG
+ * will still be returned from this function to indicate that the
+ * header was too long.
  */
-int unpack_loose_header(git_zstream *stream, unsigned char *map,
-			unsigned long mapsize, void *buffer,
-			unsigned long bufsiz, struct strbuf *hdrbuf);
+enum unpack_loose_header_result unpack_loose_header(git_zstream *stream,
+						    unsigned char *map,
+						    unsigned long mapsize,
+						    void *buffer,
+						    unsigned long bufsiz,
+						    struct strbuf *hdrbuf);
 
 /**
  * parse_loose_header() parses the starting "<type> <len>\0" of an

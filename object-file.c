@@ -1210,10 +1210,12 @@ void *map_loose_object(struct repository *r,
 	return map_loose_object_1(r, NULL, oid, size);
 }
 
-int unpack_loose_header(git_zstream *stream,
-			unsigned char *map, unsigned long mapsize,
-			void *buffer, unsigned long bufsiz,
-			struct strbuf *header)
+enum unpack_loose_header_result unpack_loose_header(git_zstream *stream,
+						    unsigned char *map,
+						    unsigned long mapsize,
+						    void *buffer,
+						    unsigned long bufsiz,
+						    struct strbuf *header)
 {
 	int status;
 
@@ -1388,7 +1390,7 @@ static int loose_object_info(struct repository *r,
 	unsigned long mapsize;
 	void *map;
 	git_zstream stream;
-	int hdr_ret;
+	enum unpack_loose_header_result hdr_ret;
 	char hdr[MAX_HEADER_LEN];
 	struct strbuf hdrbuf = STRBUF_INIT;
 	unsigned long size_scratch;
@@ -1434,18 +1436,16 @@ static int loose_object_info(struct repository *r,
 	hdr_ret = unpack_loose_header(&stream, map, mapsize, hdr, sizeof(hdr),
 				      allow_unknown ? &hdrbuf : NULL);
 	switch (hdr_ret) {
-	case 0:
+	case UNPACK_LOOSE_HEADER_RESULT_OK:
 		break;
-	case -1:
+	case UNPACK_LOOSE_HEADER_RESULT_BAD:
 		status = error(_("unable to unpack %s header"),
 			       oid_to_hex(oid));
 		break;
-	case -2:
+	case UNPACK_LOOSE_HEADER_RESULT_BAD_TOO_LONG:
 		status = error(_("header for %s too long, exceeds %d bytes"),
 			       oid_to_hex(oid), MAX_HEADER_LEN);
 		break;
-	default:
-		BUG("unknown hdr_ret value %d", hdr_ret);
 	}
 	if (!status) {
 		if (!parse_loose_header(hdrbuf.len ? hdrbuf.buf : hdr, oi))
