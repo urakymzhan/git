@@ -38,7 +38,7 @@ static const char *html_path;
 
 static int show_all = 0;
 static int show_guides = 0;
-enum show_config_type {
+static enum show_config_type {
 	SHOW_CONFIG_UNSET = 0,
 	SHOW_CONFIG_HUMAN,
 	SHOW_CONFIG_VARS,
