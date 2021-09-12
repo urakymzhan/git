@@ -44,12 +44,12 @@ test_sparse_entry_unstaged () {
 
 test_expect_success 'setup' "
 	cat >sparse_error_header <<-EOF &&
-	The following pathspecs didn't match any eligible path, but they do match index
-	entries outside the current sparse checkout:
+	The following paths and/or pathspecs matched paths that exist outside of your
+	sparse-checkout definition, so will not be updated in the index:
 	EOF
 
 	cat >sparse_hint <<-EOF &&
-	hint: Disable or modify the sparsity rules if you intend to update such entries.
+	hint: Disable or modify the sparsity rules or use the --sparse option if you intend to update such entries.
 	hint: Disable this message with \"git config advice.updateSparsePath false\"
 	EOF
 
