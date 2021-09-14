@@ -13,7 +13,7 @@ test_expect_success 'create tags' '
 '
 
 test_perf 'setup multi-pack index' '
-	git repack -ad &&
+	git repack -adb &&
 	git multi-pack-index write --bitmap
 '
 
