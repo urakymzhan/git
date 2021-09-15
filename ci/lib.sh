@@ -183,14 +183,16 @@ export GIT_TEST_CLONE_2GB=true
 export SKIP_DASHED_BUILT_INS=YesPlease
 
 case "$jobname" in
-linux-clang|linux-gcc)
-	if [ "$jobname" = linux-gcc ]
-	then
+linux-clang|linux-gcc|linux-leaks)
+	case "$jobname" in
+	linux-gcc|linux-leaks)
 		export CC=gcc-8
 		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=/usr/bin/python3"
-	else
+		;;
+	*)
 		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=/usr/bin/python2"
-	fi
+		;;
+	esac
 
 	export GIT_TEST_HTTPD=true
 
@@ -206,14 +208,16 @@ linux-clang|linux-gcc)
 	GIT_LFS_PATH="$HOME/custom/git-lfs"
 	export PATH="$GIT_LFS_PATH:$P4_PATH:$PATH"
 	;;
-osx-clang|osx-gcc)
-	if [ "$jobname" = osx-gcc ]
-	then
+osx-clang|osx-gcc|osx-leaks)
+	case "$jobname" in
+	osx-gcc|osx-leaks)
 		export CC=gcc-9
 		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=$(which python3)"
-	else
+		;;
+	*)
 		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=$(which python2)"
-	fi
+		;;
+	esac
 
 	# t9810 occasionally fails on Travis CI OS X
 	# t9816 occasionally fails with "TAP out of sequence errors" on
@@ -231,6 +235,13 @@ linux-musl)
 	MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=/usr/bin/python3 USE_LIBPCRE2=Yes"
 	MAKEFLAGS="$MAKEFLAGS NO_REGEX=Yes ICONV_OMITS_BOM=Yes"
 	MAKEFLAGS="$MAKEFLAGS GIT_TEST_UTF8_LOCALE=C.UTF-8"
+	;;
+esac
+
+case "$jobname" in
+linux-leaks|osx-leaks)
+	export SANITIZE=leak
+	export GIT_TEST_PASSING_SANITIZE_LEAK=true
 	;;
 esac
 

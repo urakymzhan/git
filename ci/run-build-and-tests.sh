@@ -17,7 +17,7 @@ fi
 
 make
 case "$jobname" in
-linux-gcc)
+linux-gcc|linux-leaks)
 	export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
 	make test
 	export GIT_TEST_SPLIT_INDEX=yes
