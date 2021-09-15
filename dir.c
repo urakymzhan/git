@@ -1294,13 +1294,54 @@ int match_pathname(const char *pathname, int pathlen,
 		 * then our prefix match is all we need; we
 		 * do not need to call fnmatch at all.
 		 */
-		if (!patternlen && !namelen)
+		if (!patternlen && (!namelen || (flags & PATTERN_FLAG_MUSTBEDIR)))
 			return 1;
 	}
 
 	return fnmatch_icase_mem(pattern, patternlen,
 				 name, namelen,
 				 WM_PATHNAME) == 0;
+}
+
+static int path_matches_dir_pattern(const char *pathname,
+				    int pathlen,
+				    struct strbuf *path_parent,
+				    int *dtype,
+				    struct path_pattern *pattern,
+				    struct index_state *istate)
+{
+	/*
+	 * Use 'alloc' as an indicator that the string has not been
+	 * initialized, in case the parent is the root directory.
+	 */
+	if (!path_parent->alloc) {
+		char *slash;
+		strbuf_addstr(path_parent, pathname);
+		slash = find_last_dir_sep(path_parent->buf);
+
+		if (slash)
+			*slash = '\0';
+		else
+			strbuf_setlen(path_parent, 0);
+	}
+
+	/*
+	 * If the parent directory matches the pattern, then we do not
+	 * need to check for dtype.
+	 */
+	if (path_parent->len &&
+	    match_pathname(path_parent->buf, path_parent->len,
+			   pattern->base,
+			   pattern->baselen ? pattern->baselen - 1 : 0,
+			   pattern->pattern, pattern->nowildcardlen,
+			   pattern->patternlen, pattern->flags))
+		return 1;
+
+	*dtype = resolve_dtype(*dtype, istate, pathname, pathlen);
+	if (*dtype != DT_DIR)
+		return 0;
+
+	return 1;
 }
 
 /*
@@ -1318,6 +1359,7 @@ static struct path_pattern *last_matching_pattern_from_list(const char *pathname
 {
 	struct path_pattern *res = NULL; /* undecided */
 	int i;
+	struct strbuf path_parent = STRBUF_INIT;
 
 	if (!pl->nr)
 		return NULL;	/* undefined */
@@ -1327,11 +1369,10 @@ static struct path_pattern *last_matching_pattern_from_list(const char *pathname
 		const char *exclude = pattern->pattern;
 		int prefix = pattern->nowildcardlen;
 
-		if (pattern->flags & PATTERN_FLAG_MUSTBEDIR) {
-			*dtype = resolve_dtype(*dtype, istate, pathname, pathlen);
-			if (*dtype != DT_DIR)
-				continue;
-		}
+		if (pattern->flags & PATTERN_FLAG_MUSTBEDIR &&
+		    !path_matches_dir_pattern(pathname, pathlen, &path_parent,
+					      dtype, pattern, istate))
+			continue;
 
 		if (pattern->flags & PATTERN_FLAG_NODIR) {
 			if (match_basename(basename,
@@ -1355,6 +1396,7 @@ static struct path_pattern *last_matching_pattern_from_list(const char *pathname
 			break;
 		}
 	}
+	strbuf_release(&path_parent);
 	return res;
 }
 
