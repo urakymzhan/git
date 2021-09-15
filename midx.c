@@ -475,6 +475,8 @@ struct write_midx_context {
 	uint32_t num_large_offsets;
 
 	int preferred_pack_idx;
+
+	struct string_list *to_include;
 };
 
 static void add_pack_to_midx(const char *full_path, size_t full_path_len,
@@ -485,6 +487,9 @@ static void add_pack_to_midx(const char *full_path, size_t full_path_len,
 	if (ends_with(file_name, ".idx")) {
 		display_progress(ctx->progress, ++ctx->pack_paths_checked);
 		if (ctx->m && midx_contains_pack(ctx->m, file_name))
+			return;
+		else if (ctx->to_include &&
+			 !string_list_has_string(ctx->to_include, file_name))
 			return;
 
 		ALLOC_GROW(ctx->info, ctx->nr + 1, ctx->alloc);
@@ -1058,6 +1063,7 @@ cleanup:
 }
 
 static int write_midx_internal(const char *object_dir,
+			       struct string_list *packs_to_include,
 			       struct string_list *packs_to_drop,
 			       const char *preferred_pack_name,
 			       unsigned flags)
@@ -1082,10 +1088,17 @@ static int write_midx_internal(const char *object_dir,
 		die_errno(_("unable to create leading directories of %s"),
 			  midx_name);
 
-	for (cur = get_multi_pack_index(the_repository); cur; cur = cur->next) {
-		if (!strcmp(object_dir, cur->object_dir)) {
-			ctx.m = cur;
-			break;
+	if (!packs_to_include) {
+		/*
+		 * Only reference an existing MIDX when not filtering which
+		 * packs to include, since all packs and objects are copied
+		 * blindly from an existing MIDX if one is present.
+		 */
+		for (cur = get_multi_pack_index(the_repository); cur; cur = cur->next) {
+			if (!strcmp(object_dir, cur->object_dir)) {
+				ctx.m = cur;
+				break;
+			}
 		}
 	}
 
@@ -1136,10 +1149,13 @@ static int write_midx_internal(const char *object_dir,
 	else
 		ctx.progress = NULL;
 
+	ctx.to_include = packs_to_include;
+
 	for_each_file_in_pack_dir(object_dir, add_pack_to_midx, &ctx);
 	stop_progress(&ctx.progress);
 
-	if (ctx.m && ctx.nr == ctx.m->num_packs && !packs_to_drop) {
+	if ((ctx.m && ctx.nr == ctx.m->num_packs) &&
+	    !(packs_to_include || packs_to_drop)) {
 		struct bitmap_index *bitmap_git;
 		int bitmap_exists;
 		int want_bitmap = flags & MIDX_WRITE_BITMAP;
@@ -1237,7 +1253,7 @@ static int write_midx_internal(const char *object_dir,
 
 	QSORT(ctx.info, ctx.nr, pack_info_compare);
 
-	if (packs_to_drop && packs_to_drop->nr) {
+	if (ctx.m && packs_to_drop && packs_to_drop->nr) {
 		int drop_index = 0;
 		int missing_drops = 0;
 
@@ -1380,7 +1396,17 @@ int write_midx_file(const char *object_dir,
 		    const char *preferred_pack_name,
 		    unsigned flags)
 {
-	return write_midx_internal(object_dir, NULL, preferred_pack_name, flags);
+	return write_midx_internal(object_dir, NULL, NULL, preferred_pack_name,
+				   flags);
+}
+
+int write_midx_file_only(const char *object_dir,
+			 struct string_list *packs_to_include,
+			 const char *preferred_pack_name,
+			 unsigned flags)
+{
+	return write_midx_internal(object_dir, packs_to_include, NULL,
+				   preferred_pack_name, flags);
 }
 
 struct clear_midx_data {
@@ -1660,7 +1686,7 @@ int expire_midx_packs(struct repository *r, const char *object_dir, unsigned fla
 	free(count);
 
 	if (packs_to_drop.nr) {
-		result = write_midx_internal(object_dir, &packs_to_drop, NULL, flags);
+		result = write_midx_internal(object_dir, NULL, &packs_to_drop, NULL, flags);
 		m = NULL;
 	}
 
@@ -1851,7 +1877,7 @@ int midx_repack(struct repository *r, const char *object_dir, size_t batch_size,
 		goto cleanup;
 	}
 
-	result = write_midx_internal(object_dir, NULL, NULL, flags);
+	result = write_midx_internal(object_dir, NULL, NULL, NULL, flags);
 	m = NULL;
 
 cleanup:
