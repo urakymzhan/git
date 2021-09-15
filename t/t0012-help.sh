@@ -34,6 +34,15 @@ test_expect_success 'basic help commands' '
 	git help -a >/dev/null
 '
 
+test_expect_success 'invalid usage' '
+	test_expect_code 129 git help -g git-add &&
+	test_expect_code 129 git help -c git-add &&
+	test_expect_code 129 git help -g git-add &&
+
+	test_expect_code 129 git help -a -c &&
+	test_expect_code 129 git help -g -c
+'
+
 test_expect_success "works for commands and guides by default" '
 	configure_help &&
 	git help status &&
@@ -87,6 +96,43 @@ test_expect_success 'git help succeeds without git.html' '
 	git -c help.htmlpath=html-with-docs help status &&
 	echo "html-with-docs/git-status.html" >expect &&
 	test_cmp expect test-browser.log
+'
+
+test_expect_success 'git help -c' '
+	git help -c >help.output &&
+	cat >expect <<-\EOF &&
+
+	'"'"'git help config'"'"' for more information
+	EOF
+	grep -v -E \
+		-e "^[^.]+\.[^.]+$" \
+		-e "^[^.]+\.[^.]+\.[^.]+$" \
+		help.output >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'git help --config-for-completion-vars' '
+	git help -c >human &&
+	grep -E \
+	     -e "^[^.]+\.[^.]+$" \
+	     -e "^[^.]+\.[^.]+\.[^.]+$" human |
+	     sed -e "s/\*.*//" -e "s/<.*//" |
+	     sort -u >human.munged &&
+
+	git help --config-for-completion-vars >vars &&
+	test_cmp human.munged vars
+'
+
+test_expect_success 'git help --config-for-completion-sections' '
+	git help -c >human &&
+	grep -E \
+	     -e "^[^.]+\.[^.]+$" \
+	     -e "^[^.]+\.[^.]+\.[^.]+$" human |
+	     sed -e "s/\..*//" |
+	     sort -u >human.munged &&
+
+	git help --config-for-completion-sections >sections &&
+	test_cmp human.munged sections
 '
 
 test_expect_success 'generate builtin list' '
