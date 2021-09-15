@@ -6,12 +6,14 @@ test_description='Tests performance using midx bitmaps'
 
 test_perf_large_repo
 
-test_expect_success 'enable multi-pack index' '
-	git config core.multiPackIndex true
+# we need to create the tag up front such that it is covered by the repack and
+# thus by generated bitmaps.
+test_expect_success 'create tags' '
+	git tag --message="tag pointing to HEAD" perf-tag HEAD
 '
 
 test_perf 'setup multi-pack index' '
-	git repack -ad &&
+	git repack -adb &&
 	git multi-pack-index write --bitmap
 '
 
