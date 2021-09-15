@@ -391,6 +391,8 @@ include::config/guitool.txt[]
 
 include::config/help.txt[]
 
+include::config/hook.txt[]
+
 include::config/http.txt[]
 
 include::config/i18n.txt[]

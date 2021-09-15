@@ -1017,7 +1017,7 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 	int reschedule_failed_exec = -1;
 	int allow_preemptive_ff = 1;
 	int preserve_merges_selected = 0;
-	struct run_hooks_opt hook_opt = RUN_HOOKS_OPT_INIT;
+	struct run_hooks_opt hook_opt = RUN_HOOKS_OPT_INIT_PARALLEL;
 	struct option builtin_rebase_options[] = {
 		OPT_STRING(0, "onto", &options.onto_name,
 			   N_("revision"),

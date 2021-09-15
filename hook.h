@@ -3,10 +3,15 @@
 #include "strbuf.h"
 #include "strvec.h"
 #include "run-command.h"
+#include "list.h"
 
 struct hook {
-	/* The path to the hook */
-	const char *hook_path;
+	struct list_head list;
+	/*
+	 * The friendly name of the hook. NULL indicates the hook is from the
+	 * hookdir.
+	 */
+	char *name;
 
 	/*
 	 * Use this to keep state for your feed_pipe_fn if you are using
@@ -22,6 +27,13 @@ struct run_hooks_opt
 
 	/* Args to be passed to each hook */
 	struct strvec args;
+
+	/*
+	 * Number of threads to parallelize across. Set to 0 to use the
+	 * 'hook.jobs' config or, if that config is unset, the number of cores
+	 * on the system.
+	 */
+	int jobs;
 
 	/*
 	 * Resolve and run the "absolute_path(hook)" instead of
@@ -66,7 +78,14 @@ struct run_hooks_opt
 	int *invoked_hook;
 };
 
-#define RUN_HOOKS_OPT_INIT { \
+#define RUN_HOOKS_OPT_INIT_SERIAL { \
+	.jobs = 1, \
+	.env = STRVEC_INIT, \
+	.args = STRVEC_INIT, \
+}
+
+#define RUN_HOOKS_OPT_INIT_PARALLEL { \
+	.jobs = 0, \
 	.env = STRVEC_INIT, \
 	.args = STRVEC_INIT, \
 }
@@ -75,6 +94,7 @@ struct hook_cb_data {
 	/* rc reflects the cumulative failure state */
 	int rc;
 	const char *hook_name;
+	struct list_head *head;
 	struct hook *run_me;
 	struct run_hooks_opt *options;
 	int *invoked_hook;
@@ -88,7 +108,13 @@ struct hook_cb_data {
 const char *find_hook(const char *name);
 
 /**
- * A boolean version of find_hook()
+ * Provides a linked list of 'struct hook' detailing commands which should run
+ * in response to the 'hookname' event, in execution order.
+ */
+struct list_head *list_hooks(const char *hookname);
+
+/**
+ * A boolean version of list_hooks()
  */
 int hook_exists(const char *hookname);
 
@@ -99,12 +125,19 @@ void run_hooks_opt_clear(struct run_hooks_opt *o);
 
 /**
  * Takes an already resolved hook found via find_hook() and runs
- * it. Does not call run_hooks_opt_clear() for you.
+ * it. Does not call run_hooks_opt_clear() for you, but does call
+ * clear_hook_list().
  *
  * See run_hooks_oneshot() for the simpler one-shot API.
  */
-int run_hooks(const char *hookname, const char *hook_path,
+int run_hooks(const char *hookname, struct list_head *hooks,
 	      struct run_hooks_opt *options);
+
+/**
+ * Empties the list at 'head', calling 'free_hook()' on each
+ * entry. Called implicitly by run_hooks() (and run_hooks_oneshot()).
+ */
+void clear_hook_list(struct list_head *head);
 
 /**
  * Calls find_hook() on your "hook_name" and runs the hooks (if any)
