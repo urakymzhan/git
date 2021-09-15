@@ -233,9 +233,11 @@ static inline int cq_must_quote(char c)
 	return cq_lookup[(unsigned char)c] + quote_path_fully > 0;
 }
 
-/* returns the longest prefix not needing a quote up to maxlen if positive.
-   This stops at the first \0 because it's marked as a character needing an
-   escape */
+/*
+ * Return the longest prefix not needing a quote up to maxlen if positive.
+ * This stops at the first \0 because it's marked as a character needing an
+ * escape.
+ */
 static size_t next_quote_pos(const char *s, ssize_t maxlen)
 {
 	size_t len;
@@ -320,11 +322,22 @@ size_t quote_c_style(const char *name, struct strbuf *sb, FILE *fp, unsigned fla
 	return quote_c_style_counted(name, -1, sb, fp, flags);
 }
 
+/*
+ * Quote concatenation of prefix and path (nothing in between); when
+ * even one of the two needs quoting, the whole thing needs to be
+ * quoted.  This is done by concatenating the result of quoting prefix
+ * and path without surrounding dq next to each other and then enclosing
+ * the whole thing inside a dq pair if needed.
+ */
 void quote_two_c_style(struct strbuf *sb, const char *prefix, const char *path,
 		       unsigned flags)
 {
-	int nodq = !!(flags & CQUOTE_NODQ);
-	if (quote_c_style(prefix, NULL, NULL, 0) ||
+	int nodq = (flags & CQUOTE_NODQ);
+	int force_dq = ((flags & CQUOTE_QUOTE_SP) &&
+			(strchr(prefix, ' ') || strchr(path, ' ')));
+
+	if (force_dq ||
+	    quote_c_style(prefix, NULL, NULL, 0) ||
 	    quote_c_style(path, NULL, NULL, 0)) {
 		if (!nodq)
 			strbuf_addch(sb, '"');

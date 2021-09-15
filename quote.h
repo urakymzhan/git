@@ -81,7 +81,8 @@ int sq_dequote_to_strvec(char *arg, struct strvec *);
 int unquote_c_style(struct strbuf *, const char *quoted, const char **endp);
 
 /* Bits in the flags parameter to quote_c_style() */
-#define CQUOTE_NODQ 01
+#define CQUOTE_NODQ 01 /* do not enclose the result in dq pair */
+#define CQUOTE_QUOTE_SP 02 /* string with SP needs quoting */
 size_t quote_c_style(const char *name, struct strbuf *, FILE *, unsigned);
 void quote_two_c_style(struct strbuf *, const char *, const char *, unsigned);
 

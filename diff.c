@@ -482,21 +482,12 @@ int git_diff_basic_config(const char *var, const char *value, void *cb)
 	return git_default_config(var, value, cb);
 }
 
-static char *quote_two(const char *one, const char *two)
+static char *quote_two(const char *one, const char *two, const struct diff_options *o)
 {
-	int need_one = quote_c_style(one, NULL, NULL, CQUOTE_NODQ);
-	int need_two = quote_c_style(two, NULL, NULL, CQUOTE_NODQ);
 	struct strbuf res = STRBUF_INIT;
+	int flags = o->flags.quote_path_with_sp ? CQUOTE_QUOTE_SP : 0;
 
-	if (need_one + need_two) {
-		strbuf_addch(&res, '"');
-		quote_c_style(one, &res, NULL, CQUOTE_NODQ);
-		quote_c_style(two, &res, NULL, CQUOTE_NODQ);
-		strbuf_addch(&res, '"');
-	} else {
-		strbuf_addstr(&res, one);
-		strbuf_addstr(&res, two);
-	}
+	quote_two_c_style(&res, one, two, flags);
 	return strbuf_detach(&res, NULL);
 }
 
@@ -1705,6 +1696,7 @@ static void emit_rewrite_diff(const char *name_a,
 	size_t size_one, size_two;
 	struct emit_callback ecbdata;
 	struct strbuf out = STRBUF_INIT;
+	int flags = o->flags.quote_path_with_sp ? CQUOTE_QUOTE_SP : 0;
 
 	if (diff_mnemonic_prefix && o->flags.reverse_diff) {
 		a_prefix = o->b_prefix;
@@ -1719,8 +1711,8 @@ static void emit_rewrite_diff(const char *name_a,
 
 	strbuf_reset(&a_name);
 	strbuf_reset(&b_name);
-	quote_two_c_style(&a_name, a_prefix, name_a, 0);
-	quote_two_c_style(&b_name, b_prefix, name_b, 0);
+	quote_two_c_style(&a_name, a_prefix, name_a, flags);
+	quote_two_c_style(&b_name, b_prefix, name_b, flags);
 
 	size_one = fill_textconv(o->repo, textconv_one, one, &data_one);
 	size_two = fill_textconv(o->repo, textconv_two, two, &data_two);
@@ -3370,8 +3362,8 @@ static void builtin_diff(const char *name_a,
 	name_a = DIFF_FILE_VALID(one) ? name_a : name_b;
 	name_b = DIFF_FILE_VALID(two) ? name_b : name_a;
 
-	a_one = quote_two(a_prefix, name_a + (*name_a == '/'));
-	b_two = quote_two(b_prefix, name_b + (*name_b == '/'));
+	a_one = quote_two(a_prefix, name_a + (*name_a == '/'), o);
+	b_two = quote_two(b_prefix, name_b + (*name_b == '/'), o);
 	lbl[0] = DIFF_FILE_VALID(one) ? a_one : "/dev/null";
 	lbl[1] = DIFF_FILE_VALID(two) ? b_two : "/dev/null";
 	strbuf_addf(&header, "%s%sdiff --git %s %s%s\n", line_prefix, meta, a_one, b_two, reset);
@@ -5373,6 +5365,8 @@ static void prep_parse_options(struct diff_options *options)
 			       PARSE_OPT_NONEG | PARSE_OPT_NOARG, diff_opt_binary),
 		OPT_BOOL(0, "full-index", &options->flags.full_index,
 			 N_("show full pre- and post-image object names on the \"index\" lines")),
+		OPT_BOOL(0, "quote-path-with-sp", &options->flags.quote_path_with_sp,
+			 N_("quote path with SP in it")),
 		OPT_COLOR_FLAG(0, "color", &options->use_color,
 			       N_("show colored diff")),
 		OPT_CALLBACK_F(0, "ws-error-highlight", options, N_("<kind>"),
